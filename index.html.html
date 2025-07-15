@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8"/>
-  <title>Produção de Redações</title>
+  <title>Sistema de Redações</title>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
     h1 { text-align: center; }
@@ -56,11 +56,15 @@
   <audio id="audioAlarme" src="https://assets.mixkit.co/active_storage/sfx/alert-fast-605-preview.mp3"></audio>
 
   <script>
-    // Turmas
-    const turmas = ["1ºSA A","1ºSA B","1ºSA C","1ºSA D","2ºSA A","2ºSA B","2ºSA C","3ºSA A","3ºSA B","1ºSBC A","1ºSBC B","2ºSBC A","2ºSBC B","3ºSBC","1ºSCS A","1ºSCS B","2ºSCS A","2ºSCS B","3ºSCS"];
-    let metas={}, feitasTurma={}; turmas.forEach(t=>{metas[t]=0;feitasTurma[t]=0;});
+    const turmas = ["1ºSA A","1ºSA B","1ºSA C","1ºSA D",
+                    "2ºSA A","2ºSA B","2ºSA C",
+                    "3ºSA A","3ºSA B",
+                    "1ºSBC A","1ºSBC B",
+                    "2ºSBC A","2ºSBC B","3ºSBC",
+                    "1ºSCS A","1ºSCS B","2ºSCS A","2ºSCS B","3ºSCS"];
+    let metas = {}, feitasTurma = {};
+    turmas.forEach(t => { metas[t]=0; feitasTurma[t]=0; });
 
-    // Elementos
     const timerEl = document.getElementById('timer'),
           startBtn = document.getElementById('start'),
           pauseBtn = document.getElementById('pause'),
@@ -71,41 +75,39 @@
           diasInput = document.getElementById('diasInput'),
           statsEl = document.getElementById('stats');
 
-    // Sons
-    function play(id,muteId,vol=1){
+    const audio = {
+      rolha: document.getElementById('audioRolha'),
+      caixa: document.getElementById('audioCaixa'),
+      toim: document.getElementById('audioToim'),
+      alarme: document.getElementById('audioAlarme')
+    };
+
+    function play(id, muteId, vol=1){
       if(!document.getElementById(muteId).checked) return;
-      const a = document.getElementById(id);
-      a.volume = vol; a.currentTime = 0; a.play();
+      const a = audio[id];
+      a.volume = vol; a.currentTime = 0; a.play().catch(()=>{});
     }
 
-    // Preenche dropdown
-    turmas.forEach(t=>{
-      let opt=document.createElement('option');
-      opt.value=t;opt.textContent=t;
+    turmas.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = t;
       turmaSelect.appendChild(opt);
     });
 
-    // Carrega estado de turmas do localStorage
-    if(localStorage.getItem('metas')) metas=JSON.parse(localStorage.getItem('metas'));
-    if(localStorage.getItem('feitasTurma')) feitasTurma=JSON.parse(localStorage.getItem('feitasTurma'));
-
-    // Persistência
-    function saveTurmas(){
-      localStorage.setItem('metas', JSON.stringify(metas));
-      localStorage.setItem('feitasTurma', JSON.stringify(feitasTurma));
-    }
-
-    // Estatísticas
     function updateStats(){
       let totalMeta=0, totalFeitas=0;
-      turmas.forEach(t=>{ totalMeta+=metas[t]; totalFeitas+=feitasTurma[t]; });
-      const faltam=Math.max(0,totalMeta-totalFeitas),
-            diaria=(faltam/(parseInt(diasInput.value)||1)).toFixed(1),
-            bruto=(totalFeitas*3.54).toFixed(3),
-            liquido=(totalFeitas*3.009).toFixed(3),
-            imposto=(totalFeitas*0.531).toFixed(3);
-      statsEl.innerHTML=`
-        <div>Feitas: ${totalFeitas} / ${totalMeta}</div>
+      turmas.forEach(t => {
+        totalMeta += metas[t];
+        totalFeitas += feitasTurma[t];
+      });
+      const faltam = Math.max(0, totalMeta - totalFeitas),
+            diaria = (faltam/(parseInt(diasInput.value)||1)).toFixed(1),
+            bruto = (totalFeitas*3.54).toFixed(3),
+            liquido = (totalFeitas*3.009).toFixed(3),
+            imposto = (totalFeitas*0.531).toFixed(3);
+
+      statsEl.innerHTML = `
+        <div>Feitas (total): ${totalFeitas} / ${totalMeta}</div>
         <div>Faltam: ${faltam}</div>
         <div>Meta diária: ${diaria}</div>
         <div>Bruto: R$ ${bruto}</div>
@@ -113,77 +115,76 @@
         <div>Imposto: R$ ${imposto}</div>`;
     }
 
-    // Sincroniza inputs ao trocar de turma
-    turmaSelect.onchange = ()=>{
-      let t=turmaSelect.value;
+    turmaSelect.onchange = () => {
+      const t = turmaSelect.value;
       metaInput.value = metas[t];
       feitasInput.value = feitasTurma[t];
     };
 
-    // Handlers de meta/feitas
-    metaInput.oninput = ()=>{
-      let t=turmaSelect.value; metas[t]=parseInt(metaInput.value)||0;
-      saveTurmas(); updateStats(); play('audioRolha','muteRolha');
+    metaInput.oninput = () => {
+      const t = turmaSelect.value;
+      metas[t] = parseInt(metaInput.value)||0;
+      updateStats();
+      play('rolha','muteRolha');
     };
-    feitasInput.oninput = ()=>{
-      let t=turmaSelect.value; feitasTurma[t]=parseInt(feitasInput.value)||0;
-      saveTurmas(); updateStats(); play('audioRolha','muteRolha');
+
+    feitasInput.oninput = () => {
+      const t = turmaSelect.value;
+      feitasTurma[t] = parseInt(feitasInput.value)||0;
+      updateStats();
+      play('rolha','muteRolha');
     };
+
     diasInput.oninput = updateStats;
 
-    // Cronômetro persistente
-    let timerId, remindId, paused=false;
-    const DURATION = 900; // 15min
-    let cycleStart = localStorage.getItem('cycleStart')||null,
-        pausedDuration = parseFloat(localStorage.getItem('pausedDuration')||0),
-        pauseTs = localStorage.getItem('pauseTs')||null;
-
+    let tempo=900, timerId, remindId, pausado=false;
     function tick(){
-      let now=Date.now();
-      let elapsed = (now - cycleStart)/1000 - pausedDuration;
-      let rem = DURATION - elapsed;
-      if(rem<=0){ rem=0; clearInterval(timerId); clearInterval(remindId); play('audioAlarme','muteAlarme'); }
-      let m=String(Math.floor(rem/60)).padStart(2,'0'),
-          s=String(Math.floor(rem%60)).padStart(2,'0');
-      timerEl.textContent=`${m}:${s}`;
-      if(rem<=150) timerEl.style.color='red'; else timerEl.style.color='green';
-    }
-
-    startBtn.onclick = ()=>{
-      if(!cycleStart){ cycleStart=Date.now(); pausedDuration=0; pauseTs=null; }
-      saved();
-      paused=false;
-      clearInterval(timerId); clearInterval(remindId);
-      timerId=setInterval(tick,1000);
-      remindId=setInterval(()=>play('audioToim','muteToim',0.5),120000);
-    };
-
-    pauseBtn.onclick = ()=>{
-      paused = !paused;
-      if(paused){
-        pauseTs = Date.now();
-      } else {
-        pausedDuration += (Date.now() - pauseTs)/1000;
-        pauseTs = null;
+      if(!pausado){
+        const m=String(Math.floor(tempo/60)).padStart(2,'0'),
+              s=String(tempo%60).padStart(2,'0');
+        timerEl.textContent = `${m}:${s}`;
+        if(tempo <= 150) timerEl.style.color = (tempo % 2 === 0) ? 'red' : '#800';
+        if(tempo <= 0){
+          clearInterval(timerId); clearInterval(remindId);
+          play('alarme','muteAlarme');
+        }
+        tempo--;
       }
-      saved();
-    };
-
-    markBtn.onclick = ()=>{
-      let t=turmaSelect.value; if(!t) return alert('Selecione turma');
-      feitasTurma[t]++; feitasInput.value=feitasTurma[t];
-      saveTurmas(); updateStats(); play('audioCaixa','muteCaixa');
-    };
-
-    function saved(){
-      localStorage.setItem('cycleStart', cycleStart);
-      localStorage.setItem('pausedDuration', pausedDuration);
-      localStorage.setItem('pauseTs', pauseTs);
     }
 
-    window.onload = ()=>{
-      if(cycleStart) startBtn.onclick();
+    startBtn.onclick = () => {
+      pausado = false;
+      clearInterval(timerId); clearInterval(remindId);
+      tempo = 900;
+      timerEl.style.color = 'green';
+      timerId = setInterval(tick, 1000);
+      remindId = setInterval(()=>play('toim','muteToim',0.5), 120000);
+    };
+
+    pauseBtn.onclick = () => { pausado = !pausado; };
+
+    markBtn.onclick = () => {
+      const t = turmaSelect.value;
+      if(!t) return alert('Selecione uma turma!');
+      feitasTurma[t]++;
+      feitasInput.value = feitasTurma[t];
       updateStats();
+      play('caixa','muteCaixa');
+    };
+
+    window.onload = () => {
+      updateStats();
+
+      // Desbloqueia os sons com o primeiro clique
+      document.body.addEventListener("click", () => {
+        Object.values(audio).forEach(a => {
+          a.volume = 0;
+          a.play().catch(()=>{});
+          a.pause();
+          a.currentTime = 0;
+          a.volume = 1;
+        });
+      }, { once: true });
     };
   </script>
 </body>
